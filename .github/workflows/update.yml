@@ -1,0 +1,65 @@
+name: Update housing dashboard
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '23 2 * * *'
+permissions:
+  contents: read
+concurrency:
+  group: housing-dashboard
+  cancel-in-progress: false
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Expand initial public assets
+        run: |
+          if [ -f seed.zip ]; then
+            unzip -o seed.zip
+            rm seed.zip
+          fi
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: python -m pip install -r requirements.txt
+      - run: python -m unittest discover -s tests -v
+      - name: Fetch official release
+        id: refresh
+        continue-on-error: true
+        run: python refresh.py
+      - name: Build dashboard with fetch status
+        run: python build_site.py
+      - name: Save public data and check history
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data site tests
+          if git ls-files --error-unmatch seed.zip >/dev/null 2>&1; then git add -u seed.zip; fi
+          if ! git diff --cached --quiet; then
+            git commit -m 'Update official housing data and check status'
+            git push
+          fi
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - name: Publish
+        id: deploy
+        uses: actions/deploy-pages@v4
+      - name: Report refresh failure after publishing status
+        if: steps.refresh.outcome == 'failure'
+        run: |
+          echo 'Fetch failed. Previous validated data remains visible with a warning.'
+          exit 1
