@@ -10,6 +10,7 @@ import sys
 import time
 import unicodedata
 import math
+import gzip
 from datetime import datetime
 from io import StringIO
 from pathlib import Path
@@ -50,12 +51,15 @@ def tier(city: str) -> str:
 def get_html(url: str, timeout: int = 45) -> str:
     if urlparse(url).scheme != 'https' or not (urlparse(url).hostname or '').endswith('.stats.gov.cn'):
         raise ValueError('仅接受国家统计局 HTTPS 来源')
-    headers = {"User-Agent": "Mozilla/5.0 (compatible; NBSHousingMonitor/1.0)"}
+    headers = {"User-Agent": "Mozilla/5.0 (compatible; NBSHousingMonitor/1.0)", "Accept-Encoding": "gzip"}
     last_error: Exception | None = None
     for attempt in range(3):
         try:
             with urlopen(Request(url, headers=headers), timeout=timeout) as response:
-                return response.read().decode('utf-8')
+                body = response.read()
+                if response.headers.get('Content-Encoding') == 'gzip':
+                    body = gzip.decompress(body)
+                return body.decode('utf-8')
         except (URLError, OSError) as error:
             last_error = error
             if attempt < 2:
@@ -114,7 +118,10 @@ def _parse_overall_table(table: pd.DataFrame, month: str, market: str, url: str)
 
 def parse_release(month: str, url: str) -> pd.DataFrame:
     html = get_html(url)
-    page_title = html_parser.fromstring(html).xpath('//title/text()')
+    tree = html_parser.fromstring(html)
+    page_title = tree.xpath('//title/text()')
+    if clean_city(''.join(page_title)) == '国家统计局信息公开':
+        page_title = tree.xpath('//h1//text() | //h2//text()')
     match = TITLE_RE.search(clean_city(''.join(page_title)))
     if not match or f'{match.group(1)}-{int(match.group(2)):02d}' != month:
         raise ValueError('发布页标题与请求月份不一致')
