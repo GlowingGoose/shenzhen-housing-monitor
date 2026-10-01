@@ -21,7 +21,9 @@ function renderChart(){
     svg+=`<path d="${path}" fill="none" stroke="${color}" stroke-width="2.5"/>`;
     for(const r of history)svg+=`<circle cx="${x(r.month)}" cy="${y(r[prefix+suffix])}" r="3.5" fill="${color}"><title>${r.month} ${prefix==='new'?'新房':'二手房'} ${pct(r[prefix+suffix])}</title></circle>`;
   }
-  history.forEach((r,i)=>{if(history.length<=12||i%2===0||i===history.length-1)svg+=`<text x="${x(r.month)}" y="${H-8}" text-anchor="middle" font-size="10" fill="#73868d">${r.month}</text>`;});
+  const labelStep=Math.max(1,Math.ceil((last-first)/8));
+  let lastLabel=-Infinity;
+  history.forEach((r,i)=>{const pos=serial(r.month);if(i===history.length-1||(pos-lastLabel>=labelStep&&last-pos>=labelStep)){svg+=`<text x="${x(r.month)}" y="${H-8}" text-anchor="middle" font-size="10" fill="#73868d">${r.month}</text>`;lastLabel=pos;}});
   $('chart').innerHTML=svg+'</svg>';
 }
 function renderCities(){
@@ -33,6 +35,8 @@ function renderCities(){
 function render(){
   const s=model.signal,last=model.history.at(-1),status=model.status;
   $('month').textContent=model.latest;
+  const firstMonth=model.history[0].month, expectedMonths=serial(model.latest)-serial(firstMonth)+1;
+  $('coverage').textContent=`官方月报：${firstMonth}—${model.latest}，已收录 ${model.history.length} / ${expectedMonths} 个月${model.history.length===expectedMonths?'，月份连续完整。':'，缺失月份保留断线。'}`;
   $('checked').textContent=status.checkedAt?'检查于 '+new Date(status.checkedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false}):'尚未完成在线检查';
   const monthNow=new Date(), nowSerial=monthNow.getFullYear()*12+monthNow.getMonth();
   const stale=nowSerial-serial(model.latest)>2;

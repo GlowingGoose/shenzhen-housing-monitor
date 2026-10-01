@@ -37,6 +37,24 @@ class MonitorTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 parse_release('2026-07','https://www.stats.gov.cn/release')
 
+    def test_official_disclosure_heading(self):
+        from housing_monitor import ALL_CITIES
+        cities=sorted(ALL_CITIES)
+        rows=[[cities[i],100,95,cities[i+35],99,94] for i in range(35)]
+        table=pd.DataFrame(rows).to_html(index=False,header=False)
+        html='<title>国家统计局信息公开</title><h2>2023年1月份70个大中城市商品住宅销售价格变动情况</h2>'+table+table
+        with patch('housing_monitor.get_html',return_value=html):
+            self.assertEqual(len(parse_release('2023-01','https://www.stats.gov.cn/release')),140)
+            with self.assertRaises(ValueError):
+                parse_release('2023-02','https://www.stats.gov.cn/release')
+
+    def test_backfilled_history_is_complete(self):
+        history=self.data[self.data['月份'].between('2023-01','2026-08')]
+        self.assertEqual(sorted(history['月份'].unique()),list(pd.period_range('2023-01','2026-08',freq='M').astype(str)))
+        self.assertEqual(len(history),6160)
+        self.assertFalse(history.duplicated(['月份','城市','市场']).any())
+        self.assertTrue(history.groupby(['月份','市场'])['城市'].nunique().eq(70).all())
+
     def test_failure_preserves_snapshot(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp); (root/'data').mkdir()
