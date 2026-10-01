@@ -30,6 +30,7 @@ def build():
     status = json.loads(status_file.read_text()) if status_file.exists() else {'ok':None,'checkedAt':None,'message':'待首次在线检查'}
     payload = {'latest':latest, 'generatedAt':datetime.now(timezone.utc).isoformat(),
         'status':status, 'signal':build_signal(data), 'history':history,
+        'records':data[['月份','城市','城市等级','市场','环比变动_pct','同比变动_pct','来源']].values.tolist(),
         'cities':data[data['月份']==latest][['城市','城市等级','市场','环比变动_pct','同比变动_pct','来源']].to_dict('records')}
     dest = ROOT / 'dist'
     shutil.copytree(ROOT/'site', dest, dirs_exist_ok=True)
