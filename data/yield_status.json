@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "checkedAt": "2026-10-07T19:22:20.977884+00:00",
+  "lastSuccess": "2026-10-07T19:22:20.977884+00:00",
+  "month": "2026-09",
+  "cities": 42,
+  "message": "同月租金与二手房价已核验",
+  "sources": [
+    "https://www.cih-index.com/data/index/esfHouse.html",
+    "https://www.cih-index.com/data/index/rentIndex.html"
+  ]
+}

@@ -2,6 +2,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 import tempfile
+import shutil
 import pandas as pd
 from housing_monitor import build_signal, _parse_overall_table, parse_release
 import refresh
@@ -63,6 +64,22 @@ class MonitorTests(unittest.TestCase):
                 self.assertEqual(refresh.refresh(),1)
             self.assertEqual((root/'data/official_70city_prices.csv').read_text(),'sentinel')
             self.assertIn('network unavailable',(root/'data/status.json').read_text())
+
+    def test_unchanged_release_keeps_original_retrieval_times(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root/'data').mkdir()
+            path = root/'data/official_70city_prices.csv'
+            shutil.copy(ROOT/'data/official_70city_prices.csv', path)
+            before = path.read_bytes()
+            latest = self.data['月份'].max()
+            fresh = self.data[self.data['月份'].eq(latest)].copy()
+            fresh['抓取时间'] = '2026-10-08T00:00:00+08:00'
+            with patch.object(refresh,'ROOT',root), \
+                 patch.object(refresh,'discover_latest_release',return_value=(latest,'https://www.stats.gov.cn/release')), \
+                 patch.object(refresh,'parse_release',return_value=fresh):
+                self.assertEqual(refresh.refresh(),0)
+            self.assertEqual(path.read_bytes(), before)
 
 if __name__=='__main__':
     unittest.main()

@@ -23,6 +23,14 @@ def refresh():
             raise ValueError('官方列表早于现存数据，需要人工核对')
         if not old.empty and set(fresh['城市']) != set(old['城市']):
             raise ValueError('70城名单变化，需要人工核对')
+        if not old.empty and month == old['月份'].max():
+            previous = old[old['月份'] == month]
+            compare = [column for column in fresh.columns if column != '抓取时间']
+            keys = ['城市', '市场']
+            before = previous[compare].sort_values(keys).reset_index(drop=True)
+            after = fresh[compare].sort_values(keys).reset_index(drop=True)
+            if before.equals(after):
+                fresh = previous.copy()  # Keep original retrieval times when the release has not changed.
         combined = pd.concat([old,fresh],ignore_index=True).drop_duplicates(['月份','城市','市场'],keep='last')
         combined = combined.sort_values(['月份','市场','城市'])
         signal = build_signal(combined)

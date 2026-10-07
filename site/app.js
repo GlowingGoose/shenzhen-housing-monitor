@@ -1,13 +1,19 @@
 const $=id=>document.getElementById(id), safe=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),pct=v=>v==null?'缺失':`${v>0?'+':''}${v.toFixed(1)}%`;
 const serial=s=>{const [y,m]=s.split('-').map(Number);return y*12+m-1;};
 let model,months,cities,selected=new Set(),lookup=new Map(),activeRows=[],activeMonths=[];
-function source(u){try{const x=new URL(u);return x.protocol==='https:'&&x.hostname.endsWith('.stats.gov.cn')?safe(u):'#';}catch{return '#';}}
+function source(u){try{const x=new URL(u);return x.protocol==='https:'&&(x.hostname.endsWith('.stats.gov.cn')||x.hostname==='www.cih-index.com')?safe(u):'#';}catch{return '#';}}
 function cityList(){const q=$('search').value.trim();$('cityList').innerHTML=cities.filter(c=>c.name.includes(q)).map(c=>`<label class="city-option"><input type="checkbox" value="${safe(c.name)}" ${selected.has(c.name)?'checked':''}>${safe(c.name)}<small>${c.tier}</small></label>`).join('');$('count').textContent=`${selected.size} / ${cities.length}`;}
+function renderYields(){
+ const rows=model.yields.filter(r=>r[0]===model.yieldLatest&&selected.has(r[1])).sort((a,b)=>b[4]-a[4]);
+ const max=Math.max(1,...rows.map(r=>r[4]));
+ $('yieldRows').innerHTML=rows.length?rows.map(r=>`<tr class="${r[1]==='深圳'?'focus-city':''}"><td>${safe(r[1])}</td><td><span class="bar" style="width:${Math.round(r[4]/max*85)}px"></span>${r[4].toFixed(2)}%</td><td>${r[3].toFixed(2)}</td><td>${Math.round(r[2]).toLocaleString('zh-CN')}</td><td>${r[5].toFixed(1)}年</td><td><span class="source-links"><a href="${source(r[6])}" target="_blank" rel="noopener">房价 ↗</a><a href="${source(r[7])}" target="_blank" rel="noopener">租金 ↗</a></span></td></tr>`).join(''):'<tr><td colspan="6">请选择城市。</td></tr>';
+ $('yieldSummary').textContent=`${rows.length} 座已选城市；覆盖 ${model.yields.filter(r=>r[0]===model.yieldLatest).length} 座可比城市。`;
+}
 function getRow(city,market,month){return lookup.get([city,market,month].join('|'));}
 function showDetail(city,market,month){const r=getRow(city,market,month);$('details').innerHTML=r?`<b>${safe(city)} · ${market==='二手'?'二手房':'新房'} · ${month}</b>　环比 ${pct(r[4])}　同比 ${pct(r[5])}<a target="_blank" rel="noopener" href="${source(r[6])}">国家统计局原文 ↗</a>`:'该月缺少官方数据。';}
 function color(v,max){if(v==null)return '#dce1e5';const t=Math.min(1,Math.abs(v)/max),a=[248,248,246],b=v>=0?[178,24,43]:[33,102,172];return `rgb(${a.map((x,i)=>Math.round(x+(b[i]-x)*t)).join(',')})`;}
 function render(){
- cityList();const start=$('start').value,end=$('end').value,idx=$('metric').value==='mom'?4:5,metric=idx===4?'环比':'同比';
+ cityList();renderYields();const start=$('start').value,end=$('end').value,idx=$('metric').value==='mom'?4:5,metric=idx===4?'环比':'同比';
  $('rangeError').textContent=start>end?'起始月份不能晚于结束月份。':'';
  activeMonths=months.filter(m=>m>=start&&m<=end);const markets=$('market').value==='all'?['新房','二手']:[$('market').value];
  activeRows=cities.filter(c=>selected.has(c.name)).flatMap(c=>markets.map(m=>({city:c.name,market:m,label:c.name+' · '+(m==='二手'?'二手房':'新房')})));
@@ -18,7 +24,7 @@ function render(){
  const values=activeRows.flatMap(r=>activeMonths.map(m=>getRow(r.city,r.market,m)?.[idx])).filter(v=>v!=null),max=Math.max(.1,...values.map(Math.abs));
  if($('view').value==='heat'){
   $('legend').innerHTML=`<span>${pct(-max)}</span><span class="gradient"></span><span>${pct(max)}</span>`;
-  $('chart').innerHTML=`<table class="heat" aria-label="70城月度${metric}热力图" style="min-width:${100+activeMonths.length*25}px"><thead><tr><th>城市 / 住宅</th>${activeMonths.map(m=>`<th><span>${m}</span></th>`).join('')}</tr></thead><tbody>${activeRows.map((r,i)=>`<tr><th>${r.label}</th>${activeMonths.map((m,j)=>{const v=getRow(r.city,r.market,m)?.[idx],label=`${r.label} ${m} ${metric} ${pct(v)}`;return `<td style="background:${color(v,max)}"><button data-row="${i}" data-month="${j}" title="${label}" aria-label="${label}"></button></td>`;}).join('')}</tr>`).join('')}</tbody></table>`;
+  $('chart').innerHTML=`<table class="heat" aria-label="可比城市月度${metric}热力图" style="min-width:${100+activeMonths.length*25}px"><thead><tr><th>城市 / 住宅</th>${activeMonths.map(m=>`<th><span>${m}</span></th>`).join('')}</tr></thead><tbody>${activeRows.map((r,i)=>`<tr><th>${r.label}</th>${activeMonths.map((m,j)=>{const v=getRow(r.city,r.market,m)?.[idx],label=`${r.label} ${m} ${metric} ${pct(v)}`;return `<td style="background:${color(v,max)}"><button data-row="${i}" data-month="${j}" title="${label}" aria-label="${label}"></button></td>`;}).join('')}</tr>`).join('')}</tbody></table>`;
  }else drawLines(idx);
 }
 function drawLines(idx){
@@ -35,12 +41,17 @@ function drawLines(idx){
  $('chart').innerHTML=out+'</svg>';$('legend').innerHTML=activeRows.length<=12?activeRows.map(r=>`<span class="key"><i style="background:${col(r)}"></i>${r.label}${r.market==='二手'?'（虚线）':''}</span>`).join(''):'新房实线 / 二手房虚线；多城市总览建议使用热力图。';
 }
 fetch('dashboard.json',{cache:'no-store'}).then(r=>{if(!r.ok)throw Error(r.status);return r.json();}).then(d=>{
- model=d;if(!d.records?.length)throw Error('缺少全量历史数据');months=[...new Set(d.records.map(r=>r[0]))].sort();cities=[...new Map(d.records.map(r=>[r[1],{name:r[1],tier:r[2]}])).values()].sort((a,b)=>['一线','二线','三线'].indexOf(a.tier)-['一线','二线','三线'].indexOf(b.tier)||a.name.localeCompare(b.name,'zh-CN'));
- selected=new Set(cities.map(c=>c.name));d.records.forEach(r=>lookup.set([r[1],r[3],r[0]].join('|'),r));for(const id of ['start','end'])$(id).innerHTML=months.map(m=>`<option>${m}</option>`).join('');$('end').value=months.at(-1);$('latest').textContent=d.latest;
+ model=d;if(!d.records?.length||!d.yields?.length)throw Error('缺少价格或租售比数据');months=[...new Set(d.records.map(r=>r[0]))].sort();cities=[...new Map(d.records.map(r=>[r[1],{name:r[1],tier:r[2]}])).values()].sort((a,b)=>['一线','二线','三线'].indexOf(a.tier)-['一线','二线','三线'].indexOf(b.tier)||a.name.localeCompare(b.name,'zh-CN'));
+ selected=new Set(cities.map(c=>c.name));d.records.forEach(r=>lookup.set([r[1],r[3],r[0]].join('|'),r));for(const id of ['start','end'])$(id).innerHTML=months.map(m=>`<option>${m}</option>`).join('');$('end').value=months.at(-1);$('latest').textContent=d.latest;$('yieldLatest').textContent=d.yieldLatest;$('yieldMonth').textContent=d.yieldLatest;
+ const sz=d.yields.find(r=>r[0]===d.yieldLatest&&r[1]==='深圳');$('shenzhenYield').textContent=sz?sz[4].toFixed(2)+'%':'—';
  const now=new Date(),stale=now.getFullYear()*12+now.getMonth()-serial(d.latest)>2;
- $('status').textContent=d.status.ok===false?'最近检查失败，展示上次数据：'+d.status.message:stale?'数据已落后超过两个月，请检查自动更新状态。':d.status.ok?'官方数据已核验 · 每天自动检查新月报':'历史数据快照 · 等待在线检查';
- $('coverage').textContent=`已收录 ${cities.length} 城 × ${months.length} 个月 × 新房/二手房，共 ${d.records.length.toLocaleString()} 条记录；${months[0]} — ${months.at(-1)}。`;
- $('checked').textContent=d.status.checkedAt?'最近检查：'+new Date(d.status.checkedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false}):'';render();
+ const warnings=[];
+ if(d.status.ok===false)warnings.push('官方价格源检查失败：'+d.status.message);
+ if(d.yieldStatus.ok===false)warnings.push('租售比源检查失败，展示上次数据：'+d.yieldStatus.message);
+ if(stale)warnings.push('官方价格月份已落后，请检查自动更新');
+ $('status').textContent=warnings.length?warnings.join('；'):'两类数据均已核验 · 每天自动检查新月报';
+ $('coverage').textContent=`交集 ${cities.length} 城；官方价格 ${months[0]}—${months.at(-1)}，租售比自 ${d.yields[0][0]} 起。两种来源月份分别显示。`;
+ $('checked').textContent=`最近检查：官方 ${d.status.checkedAt?new Date(d.status.checkedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false}):'—'}；租售比 ${d.yieldStatus.checkedAt?new Date(d.yieldStatus.checkedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false}):'—'}`;render();
 }).catch(e=>{$('status').textContent='加载失败，请刷新重试：'+e.message;});
 ['market','metric','start','end','view'].forEach(id=>$(id).addEventListener('change',()=>model&&render()));
 $('search').addEventListener('input',()=>model&&cityList());$('cityList').addEventListener('change',e=>{if(e.target.matches('input')){e.target.checked?selected.add(e.target.value):selected.delete(e.target.value);render();}});
