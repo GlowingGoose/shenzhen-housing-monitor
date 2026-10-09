@@ -1,4 +1,4 @@
-"""Collect comparable monthly asking rents and resale prices from CREIS."""
+"""Collect monthly asking rents and resale prices for a city rent-to-price ratio."""
 from __future__ import annotations
 
 import gzip
@@ -21,7 +21,7 @@ RENT_URL = 'https://www.cih-index.com/data/index/rentIndex.html'
 SALE_URL = 'https://www.cih-index.com/data/index/esfHouse.html'
 MONTH_RE = re.compile(r'^(\d{4})年(\d{1,2})月$')
 COLS = ['月份', '城市', '二手挂牌均价_元每平米', '挂牌月租_元每平米',
-        '毛租金回报率_pct', '房价租金年数', '房价来源', '租金来源']
+        '租售比', '租售比_售价相当月租月数', '房价来源', '租金来源']
 
 
 def fetch_html(url: str) -> str:
@@ -100,19 +100,18 @@ def combine(rent_month: str, rents: dict, sale_month: str, sales: dict) -> pd.Da
         rent, sale = rents[city], sales[city]
         if rent['id'] != sale['id']:
             raise ValueError(f'{city} 的房价和租金城市 ID 不一致')
-        gross = 12 * rent['value'] / sale['value'] * 100
-        if not (0 < gross < 30):
-            raise ValueError(f'{city} 租金回报率异常')
+        months = sale['value'] / rent['value']
+        if not (40 < months < 12000):
+            raise ValueError(f'{city} 租售比异常')
         records.append([rent_month, city, sale['value'], rent['value'],
-                        round(gross, 3), round(sale['value'] / (12 * rent['value']), 2),
-                        SALE_URL, RENT_URL])
+                        f'1:{math.floor(months + 0.5)}', round(months, 2), SALE_URL, RENT_URL])
     return pd.DataFrame(records, columns=COLS)
 
 
 def refresh() -> int:
     folder = ROOT / 'data'
     folder.mkdir(exist_ok=True)
-    status_path = folder / 'yield_status.json'
+    status_path = folder / 'ratio_status.json'
     prior = json.loads(status_path.read_text()) if status_path.exists() else {}
     now = datetime.now(timezone.utc).isoformat()
     try:
@@ -123,7 +122,7 @@ def refresh() -> int:
         source_age = (current.year - int(rent_month[:4])) * 12 + current.month - int(rent_month[5:])
         if source_age > 1 and current.day >= 15:
             raise ValueError(f'中指数据仍停留在 {rent_month}，已超过正常更新窗口')
-        path = folder / 'rent_sale_yield.csv'
+        path = folder / 'rent_sale_ratio.csv'
         old = pd.read_csv(path, dtype={'月份': str}) if path.exists() else pd.DataFrame(columns=COLS)
         if not old.empty and fresh['月份'].iloc[0] < old['月份'].max():
             raise ValueError('来源月份早于已保存月份')

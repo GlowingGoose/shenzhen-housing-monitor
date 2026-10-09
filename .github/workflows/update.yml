@@ -39,10 +39,10 @@ jobs:
         id: refresh
         continue-on-error: true
         run: python refresh.py
-      - name: Fetch monthly rent and resale asking prices
-        id: yield_refresh
+      - name: Fetch monthly rent-to-price ratios
+        id: ratio_refresh
         continue-on-error: true
-        run: python yield_monitor.py
+        run: python ratio_monitor.py
       - name: Build dashboard with fetch status
         run: python build_site.py
       - name: Save public data and check history
@@ -63,7 +63,7 @@ jobs:
         id: deploy
         uses: actions/deploy-pages@v4
       - name: Report refresh failure after publishing status
-        if: steps.refresh.outcome == 'failure' || steps.yield_refresh.outcome == 'failure'
+        if: steps.refresh.outcome == 'failure' || steps.ratio_refresh.outcome == 'failure'
         run: |
           echo 'A source failed. Previous validated data remains visible with a warning.'
           exit 1

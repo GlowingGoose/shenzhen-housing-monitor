@@ -1,9 +1,108 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>住宅价格与租售比 · 交集城市观察</title><link rel="stylesheet" href="style.css?v=3"><script src="app.js?v=3" defer></script></head><body>
-<header><a href="./" class="brand">▥ 住宅观察 <small>PRICE / RENT</small></a><div class="downloads"><a href="matched-city-prices.csv" download>价格数据 ↗</a><a href="rent-sale-yields.csv" download>租售比数据 ↗</a></div></header>
-<main><div class="intro"><div><p class="eyebrow">国家统计局价格变化 × 中指研究院挂牌均价</p><h1>房价与租金，放在一起看。</h1><p class="muted">仅展示来源城市名单的交集；毛租金回报率 = 12 × 月租金 ÷ 二手房价。</p></div><div class="date"><strong id="latest">—</strong><span>国家统计局价格月份</span><strong id="yieldLatest">—</strong><span>租售比月份</span></div></div>
-<p id="status" role="status">正在读取…</p>
-<section class="workspace"><aside><div class="aside-title"><h2>城市筛选</h2><span id="count"></span></div><input id="search" type="search" placeholder="搜索城市" aria-label="搜索城市"><div class="presets"><button data-preset="all">全选</button><button data-preset="none">清空</button><button data-preset="一线">一线</button><button data-preset="二线">二线</button><button data-preset="三线">三线</button><button data-preset="深圳">仅深圳</button></div><p class="hint">城市多选同时作用于租售比和价格图。</p><div id="cityList"></div></aside>
-<div class="visual"><section class="yield-section"><div class="chart-heading"><div><h2>毛租金回报率 · <span id="yieldMonth">—</span></h2><p class="muted">同月、同城挂牌租金与二手挂牌均价；未扣空置、税费及维护。</p></div><div class="yield-highlight">深圳 <strong id="shenzhenYield">—</strong></div></div><div id="yieldSummary" class="muted"></div><div class="table-wrap"><table class="yield-table"><thead><tr><th>城市</th><th>毛回报率</th><th>月租金<br>元/㎡</th><th>二手房价<br>元/㎡</th><th>房价/年租</th><th>来源</th></tr></thead><tbody id="yieldRows"></tbody></table></div><p class="hint">城市均值只供筛选；具体买房还需核对同小区、同户型的成交价和可实现租金。</p></section>
-<div class="filters"><label>住宅类型<select id="market"><option value="all">新房 + 二手房</option><option value="新房">新房</option><option value="二手">二手房</option></select></label><label>价格指标<select id="metric"><option value="mom">环比</option><option value="yoy">同比</option></select></label><label>起始月份<select id="start"></select></label><label>结束月份<select id="end"></select></label><label>图表形式<select id="view"><option value="heat">全景热力图</option><option value="line">趋势折线图</option></select></label></div>
-<div class="chart-heading"><div><h2 id="chartTitle">全国住宅价格变化</h2><p id="summary" class="muted"></p></div><div id="legend"></div></div><p id="rangeError" role="alert"></p><div id="chart"></div><div id="details" aria-live="polite">点击图中数据，查看数值和官方来源。</div><p class="hint">单位：%；指数减100。红色为上涨，蓝色为下跌；灰色为缺失。热力图色阶随筛选范围统一调整。</p></div></section>
-<footer><p id="coverage"></p><p>房价趋势：国家统计局70城月报中的交集城市；租售比：中指研究院50城普通住宅挂牌月租金与百城二手住宅挂牌均价。两套挂牌样本并非逐套配对；缺月留空，不插值。</p><p id="checked"></p></footer></main></body></html>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1d4838">
+  <title>中国各大城市历史房价走势</title>
+  <link rel="stylesheet" href="style.css?v=4">
+  <script src="app.js?v=4" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a href="./" class="brand">中国各大城市历史房价走势</a>
+    <div class="downloads">
+      <a href="matched-city-prices.csv" download>下载价格数据 ↗</a>
+      <a href="rent-sale-ratios.csv" download>下载租售比数据 ↗</a>
+    </div>
+  </header>
+
+  <main>
+    <div class="intro">
+      <div>
+        <p class="eyebrow">CITY HOUSING ATLAS · MATCHED CITY DATA</p>
+        <h1>房价走势与租售比</h1>
+        <p class="muted">用可追溯的月度数据，观察中国主要城市的价格变化和租买关系。</p>
+      </div>
+      <div class="date">
+        <div><strong id="latest">—</strong><span>统计局房价指数</span></div>
+        <div><strong id="ratioLatest">—</strong><span>中指租售比</span></div>
+      </div>
+    </div>
+
+    <p id="status" role="status">正在读取数据…</p>
+
+    <section class="workspace">
+      <aside class="sidebar">
+        <div class="aside-title"><h2>城市筛选</h2><span id="count"></span></div>
+        <input id="search" type="search" placeholder="搜索城市" aria-label="搜索城市">
+        <div class="presets">
+          <button type="button" data-preset="all">全选</button>
+          <button type="button" data-preset="none">清空</button>
+          <button type="button" data-preset="一线">一线</button>
+          <button type="button" data-preset="二线">二线</button>
+          <button type="button" data-preset="三线">三线</button>
+          <button type="button" data-preset="深圳">仅深圳</button>
+        </div>
+        <p class="hint">所选城市同步用于三个页签。</p>
+        <div id="cityList"></div>
+      </aside>
+
+      <div class="visual">
+        <nav class="tabs" role="tablist" aria-label="数据视图">
+          <button type="button" id="tab-ratio" class="is-active" data-tab="ratio" role="tab" aria-controls="panel-ratio" aria-selected="true">租售比</button>
+          <button type="button" id="tab-mom" data-tab="mom" role="tab" aria-controls="panel-price" aria-selected="false">环比走势</button>
+          <button type="button" id="tab-yoy" data-tab="yoy" role="tab" aria-controls="panel-price" aria-selected="false">同比走势</button>
+        </nav>
+
+        <section id="panel-ratio" class="panel" role="tabpanel" aria-labelledby="tab-ratio">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">PRICE TO MONTHLY RENT</p>
+              <h2>各城市租售比 <span id="ratioMonth">—</span></h2>
+              <p class="muted">租售比＝每平方米月租金：每平方米二手房价，写作 1:N。</p>
+            </div>
+            <div class="ratio-tools">
+              <label>查看月份<select id="ratioSelect" aria-label="租售比月份"></select></label>
+              <div class="ratio-feature"><span>深圳租售比</span><strong id="shenzhenRatio">—</strong></div>
+            </div>
+          </div>
+          <p class="formula">例如 1:500 表示挂牌房价约等于 500 个月的挂牌租金；N 越小，月租金相对房价越高。<a href="https://www.fangchan.com/data/13/2020-12-21/6746692391039996794.html" target="_blank" rel="noopener">查看口径 ↗</a></p>
+          <p id="ratioSummary" class="muted"></p>
+          <div class="table-wrap">
+            <table class="ratio-table">
+              <thead><tr><th>城市</th><th>租售比</th><th>月租金<br>元/㎡</th><th>二手房价<br>元/㎡</th><th>来源</th></tr></thead>
+              <tbody id="ratioRows"></tbody>
+            </table>
+          </div>
+          <p class="hint">两组数据均为城市挂牌样本，未逐套配对；实际房源还需核对成交价、可实现租金和持有成本。</p>
+        </section>
+
+        <section id="panel-price" class="panel" role="tabpanel" aria-labelledby="tab-mom" hidden>
+          <div class="panel-head price-head">
+            <div><p class="eyebrow">NATIONAL BUREAU OF STATISTICS</p><h2 id="chartTitle">房价环比走势</h2></div>
+            <p id="summary" class="muted"></p>
+          </div>
+          <div class="filters">
+            <label>住宅类型<select id="market"><option value="all">新房 + 二手房</option><option value="新房">新房</option><option value="二手">二手房</option></select></label>
+            <label>起始月份<select id="start"></select></label>
+            <label>结束月份<select id="end"></select></label>
+            <label>图表形式<select id="view"><option value="heat">全景热力图</option><option value="line">趋势折线图</option></select></label>
+          </div>
+          <div id="legend"></div>
+          <p id="rangeError" role="alert"></p>
+          <div id="chart"></div>
+          <div id="details" aria-live="polite">点击图中数据，查看数值和官方来源。</div>
+          <p class="hint">单位：%；指数减 100。红色为上涨、蓝色为下跌；灰色表示该月缺数据。</p>
+        </section>
+      </div>
+    </section>
+
+    <footer>
+      <p id="coverage"></p>
+      <p>房价走势来自国家统计局 70 城月报中的交集城市；租售比来自中指研究院 50 城住宅挂牌月租金与百城二手挂牌均价。数据按月发布，缺月留空。</p>
+      <p id="checked"></p>
+    </footer>
+  </main>
+</body>
+</html>
