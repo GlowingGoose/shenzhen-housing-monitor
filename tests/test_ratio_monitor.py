@@ -15,7 +15,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class RatioMonitorTests(unittest.TestCase):
     def test_parse_and_match_same_city_month(self):
-        matched = pd.read_csv(ROOT / 'data/rent_sale_ratio.csv')['城市'].tolist()
+        history = pd.read_csv(ROOT / 'data/rent_sale_ratio.csv', dtype={'月份': str})
+        latest = history['月份'].max()
+        matched = history.loc[history['月份'].eq(latest), '城市'].tolist()
         names = matched + [f'非统计局城市{i}' for i in range(8)]
         def page(cities, month, unit, value):
             rows = [{'city': city, 'cityId': i + 1, 'date': month,
@@ -74,9 +76,15 @@ class RatioMonitorTests(unittest.TestCase):
             self.assertEqual(price_cities, ratio_cities)
             self.assertIn('重庆', price_cities)
             self.assertNotIn('唐山', price_cities)
-            shenzhen = next(row for row in payload['ratios'] if row[1] == '深圳')
-            self.assertEqual(shenzhen[4], '1:757')
-            self.assertAlmostEqual(shenzhen[5], 756.6, places=1)
+            source = pd.read_csv(root / 'data/rent_sale_ratio.csv', dtype={'月份': str})
+            latest = source['月份'].max()
+            self.assertEqual(payload['ratioLatest'], latest)
+            self.assertEqual(len(payload['ratios']), len(source))
+            shenzhen = next(row for row in payload['ratios']
+                            if row[0] == latest and row[1] == '深圳')
+            expected = source[source['月份'].eq(latest) & source['城市'].eq('深圳')].iloc[0]
+            self.assertEqual(shenzhen[4], expected['租售比'])
+            self.assertAlmostEqual(shenzhen[5], expected['租售比_售价相当月租月数'])
             self.assertEqual(set(pd.read_csv(root / 'dist/matched-city-prices.csv')['城市']), price_cities)
             self.assertIn('租售比_售价相当月租月数', pd.read_csv(root / 'dist/rent-sale-ratios.csv').columns)
             self.assertFalse((root / 'dist/rent-sale-yields.csv').exists())
